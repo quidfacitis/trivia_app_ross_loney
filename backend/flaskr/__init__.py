@@ -93,8 +93,6 @@ def create_app(test_config=None):
   def delete_question(question_id):
       try:
         question = Question.query.filter_by(id = question_id).one_or_none()
-        if question is None:
-            abort(404)
         question.delete()
       except:
         db.session.rollback()
@@ -103,7 +101,8 @@ def create_app(test_config=None):
         db.session.close()
 
       return jsonify({
-        'success': True
+        'success': True,
+        'question': question.format()
       })
 
 
