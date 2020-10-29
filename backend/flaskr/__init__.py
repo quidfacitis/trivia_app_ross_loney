@@ -23,6 +23,9 @@ def create_app(test_config=None):
 
   @app.route('/categories')
   def get_categories():
+      """
+      Returns a success value and a category object in JSON format
+      """
       categories = Category.query.all()
       formatted_categories = {category.id: category.type for category in categories}
 
@@ -36,6 +39,18 @@ def create_app(test_config=None):
 
   @app.route('/questions', methods=['GET', 'POST'])
   def get_and_create_questions():
+      """
+      GET:
+      - Returns a success value, a list of paginated question objects (in groups of 10), total questions, categories, and the current category in JSON format
+      - Page number can be indicated with a query string at the end of the endpoint (e.g. /questions?page=3)
+
+      POST:
+      This endpoint has two functionalities:
+          1) To search for questions by question body (i.e. not by a question's answer or difficulty) using the submitted "searchTerm" (searches are case insensitive and return all results containing the submitted search term)
+            - Returns a success value, a list of paginated matching question objects (in groups of 10), total matching questions, and the current category in JSON format
+          2) To create a new question using the submitted question, answer, difficulty and category.
+            - Returns a success value and the submitted question (with its newly created id) in JSON format
+      """
       if request.method == 'GET':
           page = request.args.get('page', 1, type=int)
           start = (page - 1) * QUESTIONS_PER_PAGE
@@ -76,9 +91,13 @@ def create_app(test_config=None):
           })
       else: # POST - create
           body = request.get_json()
+          formatted_question = {}
           try:
-              new_question = Question(question=body['question'], answer=body['answer'], difficulty=body['difficulty'], category=body['category'])
-              new_question.insert()
+            new_question = Question(question=body['question'], answer=body['answer'], difficulty=body['difficulty'], category=body['category'])
+            db.session.add(new_question)
+            db.session.flush()
+            formatted_question = new_question.format()
+            db.session.commit()
           except:
             db.session.rollback()
             abort(422)
@@ -86,11 +105,16 @@ def create_app(test_config=None):
             db.session.close()
 
           return jsonify({
-            'success': True
+            'success': True,
+            'question': formatted_question
           })
 
   @app.route('/questions/<question_id>', methods=['DELETE'])
   def delete_question(question_id):
+      """
+      - Deletes a question by using question_id, which is submitted in the query string
+      - Returns a success value and the deleted question object in JSON format
+      """
       try:
         question = Question.query.filter_by(id = question_id).one_or_none()
         question.delete()
@@ -108,8 +132,16 @@ def create_app(test_config=None):
 
   @app.route('/categories/<category_id>/questions')
   def get_categories_by_id(category_id):
+      """
+      - Returns a success value, a list of the submitted category's question objects (paginated in groups of 10), the total number of questions for the provided category, and the current category id in JSON format
+      - The category_id is submitted via the query string
+      """
       if int(category_id) < 1 or int(category_id) > 6:
           abort(400)
+
+      page = request.args.get('page', 1, type=int)
+      start = (page - 1) * QUESTIONS_PER_PAGE
+      end = start + QUESTIONS_PER_PAGE
 
       questions = Question.query.filter_by(category=category_id).all()
       formatted_questions = [question.format() for question in questions]
@@ -119,13 +151,18 @@ def create_app(test_config=None):
 
       return jsonify({
         'success': True,
-        'questions': formatted_questions,
+        'questions': formatted_questions[start:end],
         'total_questions': len(formatted_questions),
         'current_category': category_id
       })
 
   @app.route('/quizzes', methods=['POST'])
   def play_quiz():
+      """
+      - Takes the "quiz_category" object containing the question id (or '0' for all questions) and the question type (or "None" for all questions), as well as a list of previous question ids ("previous_questions")
+      - Returns a success value and a new question from the submitted category whose id does not already form part of the list of previous question ids
+      - If there are no more questions available for a given category, "None" is returned as the question value, which ends the trivia game
+      """
       body = request.get_json()
       previous_questions = body['previous_questions']
       category_id = body['quiz_category']['id']

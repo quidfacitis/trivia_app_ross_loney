@@ -29,11 +29,6 @@ class TriviaTestCase(unittest.TestCase):
         """Executed after each test"""
         pass
 
-    """
-    TODO
-    Write at least one test for each test for successful operation and for expected errors.
-    """
-
     # IMPORTANT: TO POPULATE TEST DATABASE BEFORE RUNNING TESTS, RUN "psql trivia_test < trivia.psql" FROM THE BACKEND FOLDER IN THE TERMINAL
     def test_get_categories(self):
         res = self.client().get('/categories')
@@ -90,8 +85,10 @@ class TriviaTestCase(unittest.TestCase):
 
         self.assertEqual(res.status_code, 200)
         self.assertEqual(data['success'], True)
-        self.assertTrue(question)
+        self.assertTrue(question) # from search
         self.assertEqual(question.answer, 'seven')
+        self.assertTrue(data['question']) # from returned formatted question
+        self.assertEqual(data['question']['answer'], 'seven' ) 
 
         # Delete test question
         question.delete()
